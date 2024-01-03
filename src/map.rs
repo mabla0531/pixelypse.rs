@@ -6,13 +6,12 @@ pub const CHUNK_SIZE: usize = 8;
 pub const CHUNK_SIZE_PIXELS: u32 = CHUNK_SIZE as u32 * 32;
 
 pub struct Map {
-    pub terrain_texture: SfBox<Texture>,
     pub chunks: Vec<Vec<Chunk>>,
     pub entities: Vec<Box<dyn Entity>>,
 }
 
 impl Map {
-    pub fn new(assets: &Assets) -> Self {
+    pub fn new() -> Self {
         let mut chunks = Vec::new();
 
         for x in 0..8 {
@@ -24,7 +23,6 @@ impl Map {
         }
 
         Map {
-            terrain_texture: assets.terrain_texture.clone(),
             chunks,
             entities: Vec::new(),
         }
@@ -34,9 +32,9 @@ impl Map {
         return Vector2u::new(self.chunks.len() as u32 * CHUNK_SIZE_PIXELS, self.chunks[0].len() as u32 * CHUNK_SIZE_PIXELS);
     }
 
-    pub fn render(&self, window: &mut RenderWindow, game_camera: Rect<f32>) {
+    pub fn render(&self, window: &mut RenderWindow, terrain_texture: &SfBox<Texture>, game_camera: Rect<f32>) {
         let mut sprite = Sprite::new();
-        sprite.set_texture(&self.terrain_texture, true);
+        sprite.set_texture(&terrain_texture, true);
         sprite.set_texture_rect(Rect::new(224, 512, 32, 32));
 
 

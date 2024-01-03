@@ -7,11 +7,13 @@ mod entities;
 use std::time::Instant;
 
 use assets::Assets;
+use sfml::system::Vector2f;
 use states::state::State;
 use states::game_state::GameState;
 
 use sfml::window::*;
 use sfml::graphics::*;
+use sfml::window::mouse::*;
 
 struct System {
     window: RenderWindow,
@@ -49,17 +51,10 @@ impl System {
         while let Some(event) = self.window.poll_event() {
             match event {
                 Event::Closed => self.window.close(),
-                Event::KeyPressed {code: Key::W, scan: _, alt: _, ctrl: _, shift: _, system: _} => self.states[top_state_index].keypress_event(Key::W),
-                Event::KeyPressed {code: Key::A, scan: _, alt: _, ctrl: _, shift: _, system: _} => self.states[top_state_index].keypress_event(Key::A),
-                Event::KeyPressed {code: Key::S, scan: _, alt: _, ctrl: _, shift: _, system: _} => self.states[top_state_index].keypress_event(Key::S),
-                Event::KeyPressed {code: Key::D, scan: _, alt: _, ctrl: _, shift: _, system: _} => self.states[top_state_index].keypress_event(Key::D),
-                
-                Event::KeyReleased {code: Key::W, alt: _, ctrl: _, shift: _, system: _} => self.states[top_state_index].keyrelease_event(Key::W),
-                Event::KeyReleased {code: Key::A, alt: _, ctrl: _, shift: _, system: _} => self.states[top_state_index].keyrelease_event(Key::A),
-                Event::KeyReleased {code: Key::S, alt: _, ctrl: _, shift: _, system: _} => self.states[top_state_index].keyrelease_event(Key::S),
-                Event::KeyReleased {code: Key::D, alt: _, ctrl: _, shift: _, system: _} => self.states[top_state_index].keyrelease_event(Key::D),
-                
-                _ => println!("{:?}", event),
+                Event::MouseButtonPressed { button: b, x: _, y: _ } => self.states[top_state_index].mouse_press_event(b),
+                Event::MouseButtonReleased { button: b, x: _, y: _ } => self.states[top_state_index].mouse_release_event(b),
+                Event::MouseMoved { x: x_move, y: y_move } => self.states[top_state_index].mouse_position_event(Vector2f::new(x_move as f32, y_move as f32)),
+                _ => {println!("{:?}", event)},
             }
         }
 
@@ -81,8 +76,10 @@ impl System {
         while self.window.is_open() {
             if tick_time.elapsed().as_millis() >= 10 {
                 tick_time = Instant::now();
+
                 self.update();
             }
+
             self.render();
         }
     }
