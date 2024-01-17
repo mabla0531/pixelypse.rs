@@ -1,17 +1,19 @@
-use std::time::Instant;
+use kira::manager::{AudioManager, AudioManagerSettings};
+use sfml::{system::Vector2f, graphics::{RenderWindow, Sprite, Rect, Transformable, RenderTarget}};
 
-use sfml::{system::Vector2f, graphics::{RenderWindow, Texture, Sprite, Rect, Transformable, RenderTarget}, SfBox};
+use crate::{states::game_state::{MouseData, KeyboardData}, Util, assets::Assets};
 
 use super::entity::{Entity, EntityType, Behavior};
-
-use rand::Rng;
 
 pub struct Zombie {
     pub x: f32,
     pub y: f32,
     behavior: Behavior,
-    roaming_direction: Vector2f,
-    behavior_delta: Instant,
+    pub scale: u32,
+
+    pub assets: Assets,
+
+    pub audio_manager: AudioManager,
 }
 
 impl Entity for Zombie {
@@ -20,80 +22,66 @@ impl Entity for Zombie {
     }
 
     fn get_speed(&self) -> f32 {
-        0.25
+        0.5 * self.scale as f32
     }
 
     fn get_position(&self) -> Vector2f {
         return Vector2f::new(self.x, self.y);
     }
 
-    fn move_entity(&mut self, x_move: f32, y_move: f32) {
-        let mut x = x_move;
-        let mut y = y_move;
+    fn move_entity(&mut self, _: f32, _: f32) {
 
-        let sqrt_two = f32::from(2.0).sqrt();
+        
+    }
 
-        if x != 0.0 && y != 0.0 {
-            x = self.get_speed() / sqrt_two;
-            y = self.get_speed() / sqrt_two;
-        }
+    fn move_towards_position(&mut self, position: Vector2f) {
+
+        let angle = Util::get_angle(position, self.get_position());
+
+        let x = self.get_speed() * libm::cos(angle) as f32;
+        let y = self.get_speed() * libm::sin(angle) as f32;
+
 
         self.x += x;
         self.y += y;
     }
 
-    fn update(&mut self) {
+    fn update(&mut self, reference_position: Vector2f, _: KeyboardData, _: MouseData) {
         match self.behavior {
             Behavior::STATIC => { },
-            Behavior::ROAMING => self.move_entity(self.roaming_direction.x, self.roaming_direction.y),
-            Behavior::CHASING => {
-
-            }
+            Behavior::CHASING => self.move_towards_position(reference_position), 
         }
-
-        if self.behavior_delta.elapsed().as_millis() >= 4000 && self.behavior == Behavior::ROAMING {
-            self.behavior_delta = Instant::now();
-            self.behavior = Behavior::STATIC;
-        }
-
-        if self.behavior_delta.elapsed().as_millis() >= 2000 && self.behavior == Behavior::STATIC {
-            self.behavior_delta = Instant::now();
-            self.behavior = Behavior::ROAMING;
-            self.roaming_direction = match (rand::thread_rng().gen::<f32>() * 10.0) as u16 {
-                0 => Vector2f::new(0.0, -self.get_speed()),
-                1 => Vector2f::new(self.get_speed(), -self.get_speed()),
-                2 => Vector2f::new(self.get_speed(), 0.0),
-                3 => Vector2f::new(self.get_speed(), self.get_speed()),
-                4 => Vector2f::new(0.0, self.get_speed()),
-                5 => Vector2f::new(-self.get_speed(), self.get_speed()),
-                6 => Vector2f::new(-self.get_speed(), 0.0),
-                7 => Vector2f::new(-self.get_speed(), -self.get_speed()),
-                8 => Vector2f::new(0.0, 0.0),
-                9 => Vector2f::new(0.0, 0.0),
-                _ => Vector2f::new(0.0, 0.0),
-            };
-        }
+        
+        let delta = self.get_position() - reference_position;
+        self.behavior = if delta.x.abs() < 256.0 && delta.y.abs() < 256.0 {
+            Behavior::CHASING
+        } else {
+            Behavior::STATIC
+        };
     }
 
-    fn render(&self, window: &mut RenderWindow, texture: &SfBox<Texture>, camera_offset: Vector2f) {
+    fn render(&self, window: &mut RenderWindow, camera_offset: Vector2f) {
         let mut sprite = Sprite::new();
-        sprite.set_texture(texture, true);
+        sprite.set_texture(&self.assets.zombie_texture, true);
         sprite.set_texture_rect(Rect::new(32, 128, 32, 32));
 
-        sprite.set_position(Vector2f::new(self.x - camera_offset.x, self.y - camera_offset.y));
+        let half_sprite = self.scale as f32 / 2.0;
+        sprite.set_position(self.get_position() - camera_offset - Vector2f::new(half_sprite, half_sprite));
+        sprite.set_scale(Vector2f::new(self.scale as f32, self.scale as f32));
 
         window.draw(&sprite);
     }
 }
 
 impl Zombie {
-    pub fn new() -> Self {
+    pub fn new(scale: u32, assets: Assets) -> Self {
         Zombie {
             x: 256.0,
             y: 256.0,
             behavior: Behavior::STATIC,
-            roaming_direction: Vector2f::new(0.0, 0.0),
-            behavior_delta: Instant::now(),
+            scale,
+            assets,
+            audio_manager: AudioManager::new(AudioManagerSettings::default()).unwrap(),
         }
     }
 }

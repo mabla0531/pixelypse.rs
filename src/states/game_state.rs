@@ -1,13 +1,25 @@
-use std::time::Instant;
+use sfml::{
+    graphics::{Rect, RenderWindow},
+    system::{Vector2f, Vector2u},
+    window::{mouse::Button, Key},
+};
 
-use sfml::{graphics::{RenderWindow, Rect}, window::{Key, mouse::Button}, system::{Vector2u, Vector2f}};
+use crate::{
+    assets::Assets,
+    entities::{entity::{Entity, EntityType}, player::Player, zombie::Zombie},
+    map::Map,
+    State,
+};
 
-use crate::{State, assets::Assets, map::Map, entities::{entity::{Entity, self}, player::Player, zombie::Zombie}};
-
+#[derive(Clone)]
 pub struct KeyboardData {
-    
+    pub w: bool,
+    pub a: bool,
+    pub s: bool,
+    pub d: bool,
 }
 
+#[derive(Clone)]
 pub struct MouseData {
     pub position: Vector2f,
     pub left_click: bool,
@@ -20,53 +32,63 @@ pub struct GameState {
     pub player: usize, //index of player, so it can always be handled
     pub keyboard_data: KeyboardData,
     pub mouse_data: MouseData,
+    pub game_camera: Rect<f32>,
     pub window_size: Vector2u,
     pub assets: Assets,
+    pub scale: u32,
 }
 
 impl GameState {
-    pub fn new(assets: &Assets, window_size: Vector2u) -> Self {
-
-        let map = Map::new();
+    pub fn new(assets: Assets, window_size: Vector2u, scale: u32) -> Self {
+        let map = Map::new(scale);
 
         let mut entities: Vec<Box<dyn Entity>> = Vec::new();
 
-        entities.push(Box::new(Player::new()));
-        entities.push(Box::new(Zombie::new()));
+        entities.push(Box::new(Player::new(scale, assets.clone())));
+        entities.push(Box::new(Zombie::new(scale, assets.clone())));
         let player = 0;
 
-        let keyboard = KeyboardData {};
-        let mouse = MouseData {
+        let keyboard_data = KeyboardData {w: false, a: false, s: false, d: false};
+        let mouse_data = MouseData {
             position: Vector2f::new(0.0, 0.0),
             left_click: false,
             right_click: false,
         };
 
+        let game_camera = Rect::new(0.0, 0.0, 0.0, 0.0);
+
         GameState {
             map,
             entities,
             player,
-            keyboard_data: keyboard,
-            mouse_data: mouse,
+            keyboard_data: keyboard_data,
+            mouse_data: mouse_data,
+            game_camera,
             window_size,
-            assets: assets.clone(),
+            assets,
+            scale,
         }
     }
 }
 
 impl State for GameState {
-
     fn keypress_event(&mut self, key: Key) {
         match key {
-            
-            _ => {},
+            Key::W => self.keyboard_data.w = true,
+            Key::A => self.keyboard_data.a = true,
+            Key::S => self.keyboard_data.s = true,
+            Key::D => self.keyboard_data.d = true,
+            _ => {}
         }
     }
 
     fn keyrelease_event(&mut self, key: Key) {
         match key {
-            
-            _ => {},
+            Key::W => self.keyboard_data.w = false,
+            Key::A => self.keyboard_data.a = false,
+            Key::S => self.keyboard_data.s = false,
+            Key::D => self.keyboard_data.d = false,
+            _ => {}
         }
     }
 
@@ -74,7 +96,7 @@ impl State for GameState {
         match button {
             Button::Left => self.mouse_data.left_click = true,
             Button::Right => self.mouse_data.right_click = true,
-            _ => {},
+            _ => {}
         }
     }
 
@@ -82,7 +104,7 @@ impl State for GameState {
         match button {
             Button::Left => self.mouse_data.left_click = false,
             Button::Right => self.mouse_data.right_click = false,
-            _ => {},
+            _ => {}
         }
     }
 
@@ -91,50 +113,51 @@ impl State for GameState {
     }
 
     fn update(&mut self) {
-        let player = &mut self.entities[self.player];
+        let entities = &mut self.entities;
+        let player_position = entities[self.player].get_position();
 
-        if self.mouse_data.left_click {
-            let delta = self.mouse_data.position - player.get_position();
+        self.game_camera = Rect::new(
+            player_position.x + 16.0 - self.window_size.x as f32 / 2.0,
+            player_position.y + 16.0 - self.window_size.y as f32 / 2.0,
+            self.window_size.x as f32,
+            self.window_size.y as f32,
+        );
 
-            let angle = libm::atan2(delta.y as f64, delta.x as f64);
+        self.game_camera.left = self.game_camera.left
+            .max(0.0)
+            .min(self.map.get_map_size_pixels().x as f32 - self.game_camera.width);
+        self.game_camera.top = self.game_camera.top
+            .max(0.0)
+            .min(self.map.get_map_size_pixels().y as f32 - self.game_camera.height);
 
-
-            let x = player.get_speed() * libm::cos(angle) as f32;
-            let y = player.get_speed() * libm::sin(angle) as f32;
-
-            player.move_entity(x, y);
+        for index in 0..entities.len() {
+            if entities[index].get_type() == EntityType::PLAYER {
+                self.player = index;
+            }
         }
 
-        for entity in &mut self.entities { entity.update(); }
+        for index in 0..entities.len() {
+            let reference_position = match entities[index].get_type() {
+                //if the entity is a player, pass the game camera as position
+                EntityType::PLAYER => Vector2f::new(self.game_camera.left, self.game_camera.top), 
+                _ => entities[self.player].get_position()
+            };
+
+            entities[index].update(reference_position, self.keyboard_data.clone(), self.mouse_data.clone());
+        }
     }
 
     fn render(&mut self, window: &mut RenderWindow) {
-        let player_position = self.entities[self.player].get_position();
-
-        let mut game_camera = Rect::new(player_position.x + 16.0 - self.window_size.x as f32 / 2.0,
-                                                   player_position.y + 16.0 - self.window_size.y as f32 / 2.0,
-                                                   self.window_size.x as f32,
-                                                   self.window_size.y as f32);
+        //sort entities by Y as to render the higher ones first
+        self.entities.sort_by(
+            |e1, e2| 
+            e1.get_position().y.total_cmp(&e2.get_position().y)
+        );
         
-        game_camera.left = game_camera.left.max(0.0);
-        game_camera.top = game_camera.top.max(0.0);
-        game_camera.left = game_camera.left.min(self.map.get_map_size_pixels().x as f32 - game_camera.width);
-        game_camera.top = game_camera.top.min(self.map.get_map_size_pixels().y as f32 - game_camera.height);
+        self.map.render(window, &self.assets.terrain_texture, self.game_camera);
 
-        self.map.render(window, &self.assets.terrain_texture, game_camera);
-
-        for entity_index in 0..self.entities.len() {
-            self
-            .entities[entity_index]
-            .render(
-                window, 
-                if entity_index != self.player {
-                    &self.assets.zombie_texture
-                } else {
-                    &self.assets.player_texture
-                }, 
-                Vector2f::new(game_camera.left, game_camera.top)
-            );
+        for entity in &self.entities {
+            entity.render(window, Vector2f::new(self.game_camera.left, self.game_camera.top));
         }
     }
 }
