@@ -1,14 +1,12 @@
 use kira::sound::static_sound::{StaticSoundSettings, StaticSoundData};
-use sfml::SfBox;
-use sfml::graphics::{Texture, Font};
+use opengl_graphics::{Texture, TextureSettings};
 
-#[derive(Clone)]
 pub struct Assets {
-    pub terrain_texture: SfBox<Texture>,
-    pub player_texture: SfBox<Texture>,
-    pub zombie_texture: SfBox<Texture>,
+    pub terrain_texture: Texture,
+    pub player_texture: Texture,
+    pub zombie_texture: Texture,
 
-    pub font: SfBox<Font>,
+    //pub font: SfBox<Font>,
 
     pub handgun_cock: StaticSoundData,
     pub handgun_fire: StaticSoundData,
@@ -17,11 +15,11 @@ pub struct Assets {
 impl Assets {
     pub fn new() -> Assets {
 
-        let terrain_texture = Texture::from_file("res/textures/terrain.png").unwrap();
-        let player_texture = Texture::from_file("res/textures/player.png").unwrap();
-        let zombie_texture = Texture::from_file("res/textures/zombie.png").unwrap();
+        let terrain_texture = Texture::from_path("res/textures/terrain.png", &TextureSettings::new()).unwrap();
+        let player_texture = Texture::from_path("res/textures/player.png", &TextureSettings::new()).unwrap();
+        let zombie_texture = Texture::from_path("res/textures/zombie.png", &TextureSettings::new()).unwrap();
 
-        let font = Font::from_file("res/default.ttf").unwrap();
+        //let font = Font::from_file("res/default.ttf").unwrap();
 
         let handgun_cock = StaticSoundData::from_file("res/sounds/handgun_cock.wav", StaticSoundSettings::default()).unwrap();
         let handgun_fire = StaticSoundData::from_file("res/sounds/handgun_fire.wav", StaticSoundSettings::default()).unwrap();
@@ -31,7 +29,7 @@ impl Assets {
             player_texture,
             zombie_texture,
             
-            font,
+            //font,
 
             handgun_cock,
             handgun_fire,

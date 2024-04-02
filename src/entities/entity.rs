@@ -1,6 +1,7 @@
-use sfml::{graphics::RenderWindow, system::Vector2f};
+use graphics::Context;
+use opengl_graphics::GlGraphics;
 
-use crate::states::game_state::{MouseData, KeyboardData};
+use crate::{states::game_state::{KeyboardData, MouseData}, util::Point};
 
 #[derive(PartialEq)]
 pub enum EntityType {
@@ -15,11 +16,11 @@ pub enum Behavior {
 }
 
 pub trait Entity {
-    fn move_towards_position(&mut self, position: Vector2f);
-    fn move_entity(&mut self, x: f32, y: f32);
+    fn move_towards_position(&mut self, position: Point<f64>);
+    fn move_entity(&mut self, x: f64, y: f64);
     fn get_type(&self) -> EntityType;
-    fn get_speed(&self) -> f32;
-    fn get_position(&self) -> Vector2f;
-    fn update(&mut self, reference_position: Vector2f, key_data: KeyboardData, mouse_data: MouseData);
-    fn render(&self, window: &mut RenderWindow, camera_offset: Vector2f);
+    fn get_speed(&self) -> f64;
+    fn get_position(&self) -> Point<f64>;
+    fn update(&mut self, reference_position: Point<f64>, key_data: KeyboardData, mouse_data: MouseData);
+    fn render(&self, c: Context, g: &mut GlGraphics, camera_offset: Point<f64>);
 }

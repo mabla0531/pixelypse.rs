@@ -1,34 +1,40 @@
-use std::{f32::consts::SQRT_2, time::Instant};
+use std::{f32::consts::SQRT_2, sync::Arc, time::Instant};
 
+use graphics::{Context, DrawState, Image, Transformed};
 use kira::manager::{AudioManager, AudioManagerSettings};
-use sfml::{graphics::{Sprite, Rect, RenderTarget, Transformable, RenderWindow}, system::Vector2f};
+use opengl_graphics::GlGraphics;
 
-use crate::{states::game_state::{MouseData, KeyboardData}, assets::Assets};
+use crate::{assets::Assets, states::game_state::{KeyboardData, MouseData}, util::Point, TILE_SIZE};
 
 use super::entity::{Entity, EntityType};
 
+pub const PLAYER_IMG: Image = Image {
+    color: None,
+    rectangle: Some([0.0, 0.0, TILE_SIZE as f64, TILE_SIZE as f64]),
+    source_rectangle: Some([0.0, 0.0, TILE_SIZE as f64, TILE_SIZE as f64]),
+};
+
 pub struct Player {
-    pub x: f32,
-    pub y: f32,
-    pub destination: Option<Vector2f>,
-    pub scale: u32,
+    pub x: f64,
+    pub y: f64,
+    pub destination: Option<Point<f64>>,
 
     pub firing_cooldown: Instant,
 
-    pub assets: Assets,
+    pub assets: Arc<Assets>,
 
     pub audio_manager: AudioManager,
 }
 
 impl Entity for Player {
     
-    fn move_towards_position(&mut self, position: Vector2f) {
+    fn move_towards_position(&mut self, _: Point<f64>) {
         
     }
 
-    fn move_entity(&mut self, x: f32, y: f32) {
+    fn move_entity(&mut self, x: f64, y: f64) {
         if x != 0.0 && y != 0.0 {
-            let diagonal_movement = self.get_speed() / SQRT_2;
+            let diagonal_movement = self.get_speed() / SQRT_2 as f64;
             self.x += diagonal_movement * x.signum();
             self.y += diagonal_movement * y.signum();
         } else {
@@ -41,15 +47,13 @@ impl Entity for Player {
         EntityType::PLAYER
     }
 
-    fn get_speed(&self) -> f32 {
-        0.75 * self.scale as f32
+    fn get_speed(&self) -> f64 { 0.75 }
+
+    fn get_position(&self) -> Point<f64> {
+        return Point::new(self.x, self.y);
     }
 
-    fn get_position(&self) -> Vector2f {
-        return Vector2f::new(self.x, self.y);
-    }
-
-    fn update(&mut self, _: Vector2f, key_data: KeyboardData, mouse_data: MouseData) {
+    fn update(&mut self, _: Point<f64>, key_data: KeyboardData, mouse_data: MouseData) {
         
         if mouse_data.left_click {
             if self.firing_cooldown.elapsed().as_millis() >= 1000 {
@@ -66,24 +70,25 @@ impl Entity for Player {
         self.move_entity(x_move, y_move);
     }
 
-    fn render(&self, window: &mut RenderWindow, camera_offset: Vector2f) {
-
-        let mut sprite = Sprite::new();
-        sprite.set_texture(&self.assets.player_texture, true);
-        sprite.set_texture_rect(Rect::new(32, 128, 32, 32));
-        sprite.set_position(self.get_position() - camera_offset - Vector2f::new(16.0, 16.0));
-        sprite.set_scale(Vector2f::new(self.scale as f32, self.scale as f32));
-        window.draw(&sprite);
+    fn render(&self, c: Context, g: &mut GlGraphics, camera_offset: Point<f64>) {
+        PLAYER_IMG.draw(
+            &self.assets.player_texture, 
+            &DrawState::default(), 
+            c.transform.trans(
+                self.x - camera_offset.x, 
+                self.y - camera_offset.y
+            ), 
+            g
+        );
     }
 }
 
 impl Player {
-    pub fn new(scale: u32, assets: Assets) -> Self {
+    pub fn new(assets: Arc<Assets>) -> Self {
         Player {
             x: 32.0,
             y: 32.0,
             destination: None,
-            scale,
             firing_cooldown: Instant::now(),
             assets,
             audio_manager: AudioManager::new(AudioManagerSettings::default()).unwrap(),

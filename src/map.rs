@@ -1,25 +1,38 @@
-use sfml::{graphics::{RenderWindow, Sprite, Transformable, RenderTarget, Rect, Texture}, system::{Vector2f, Vector2u}, SfBox};
+use std::sync::Arc;
 
-use crate::entities::entity::Entity;
+use graphics::{Context, DrawState, Image, Transformed};
+use opengl_graphics::GlGraphics;
+
+use crate::{assets::Assets, entities::entity::Entity, util::{Point, Rect}, TILE_SIZE};
 
 pub const CHUNK_SIZE: usize = 8;
+
+// source Image objects, containing the image size and pointing to where the texture exists on the spritesheet
+pub const DIRT_IMG: Image = Image {
+    color: None,
+    rectangle: Some([0.0, 0.0, TILE_SIZE as f64, TILE_SIZE as f64]),
+    source_rectangle: Some([0.0, 0.0, TILE_SIZE as f64, TILE_SIZE as f64]),
+};
 
 pub struct Map {
     pub chunks: Vec<Vec<Chunk>>,
     pub entities: Vec<Box<dyn Entity>>,
-    pub scale: u32,
-    pub chunk_size_pixels: u32,
+    pub assets: Arc<Assets>
 }
 
 impl Map {
-    pub fn new(scale: u32) -> Self {
+    pub fn new(assets: Arc<Assets>) -> Self {
         let mut chunks = Vec::new();
-        let chunk_size_pixels = CHUNK_SIZE as u32 * 32 * scale;
 
         for x in 0..8 {
             let mut chunk_row: Vec<Chunk> = Vec::new();
             for y in 0..8 {
-                chunk_row.push(Chunk::new(x * chunk_size_pixels, y * chunk_size_pixels, scale));
+                chunk_row.push(
+                    Chunk::new(
+                        (x * Self::chunk_size_pixels()) as u32, 
+                        (y * Self::chunk_size_pixels()) as u32
+                    )
+                );
             }
             chunks.push(chunk_row);
         }
@@ -27,29 +40,36 @@ impl Map {
         Map {
             chunks,
             entities: Vec::new(),
-            scale,
-            chunk_size_pixels,
+            assets
         }
     }
 
-    pub fn get_map_size_pixels(&self) -> Vector2u {
-        return Vector2u::new(self.chunks.len() as u32 * self.chunk_size_pixels, self.chunks[0].len() as u32 * self.chunk_size_pixels);
+    pub fn chunk_size_pixels() -> usize {
+        CHUNK_SIZE * TILE_SIZE
     }
 
-    pub fn render(&self, window: &mut RenderWindow, terrain_texture: &SfBox<Texture>, game_camera: Rect<f32>) {
-        let mut sprite = Sprite::new();
-        sprite.set_texture(&terrain_texture, true);
-        sprite.set_texture_rect(Rect::new(224, 512, 32, 32));
+    pub fn get_map_size_pixels(&self) -> Point<u32> {
+        println!("{}\n{}\n{}\n", self.chunks.len(), Self::chunk_size_pixels(), self.chunks[0].len());
+        return Point::new(
+            self.chunks.len() as u32 * Self::chunk_size_pixels() as u32, 
+            self.chunks[0].len() as u32 * Self::chunk_size_pixels() as u32
+        );
+    }
 
+    pub fn render(&self, c: Context, g: &mut GlGraphics, camera_offset: Rect<f64>) {
 
-        for y in 0..self.chunks.len() as i32 {
-            for x in 0..self.chunks[y as usize].len() as i32 {
-
-                if  (x + 1) * self.chunk_size_pixels as i32 >= game_camera.left as i32 && 
-                    (y + 1) * self.chunk_size_pixels as i32 >= game_camera.top as i32 && 
-                    (x - 1) * self.chunk_size_pixels as i32 <= (game_camera.left + game_camera.width) as i32 &&
-                    (y - 1) * self.chunk_size_pixels as i32 <= (game_camera.top + game_camera.height) as i32 {
-                        self.chunks[x as usize][y as usize].render(window, &mut sprite, Vector2f::new(game_camera.left, game_camera.top));
+        for y in 0..self.chunks.len() {
+            for x in 0..self.chunks[y as usize].len() {
+                if camera_offset.contains(Point::new((x * TILE_SIZE) as f64, (y * TILE_SIZE) as f64)) {
+                    DIRT_IMG.draw(
+                        &self.assets.zombie_texture, 
+                        &DrawState::default(), 
+                        c.transform.trans(
+                            x as f64 - camera_offset.left, 
+                            y as f64 - camera_offset.top
+                        ), 
+                        g
+                    );
                 }
             }
         }
@@ -60,11 +80,10 @@ pub struct Chunk {
     pub tiles: [[u16; CHUNK_SIZE]; CHUNK_SIZE],
     pub x: u32,
     pub y: u32,
-    pub scale: u32,
 }
 
 impl Chunk {
-    pub fn new(x: u32, y: u32, scale: u32) -> Self {
+    pub fn new(x: u32, y: u32) -> Self {
         let tiles: [[u16; CHUNK_SIZE]; CHUNK_SIZE] = [
             [1, 1, 1, 1, 1, 1, 1, 1],
             [1, 1, 1, 1, 1, 1, 1, 1],
@@ -80,28 +99,6 @@ impl Chunk {
             tiles,
             x, 
             y,
-            scale,
-        }
-    }
-
-    pub fn render(&self, window: &mut RenderWindow, sprite: &mut Sprite, camera_offset: Vector2f) {
-        for x in 0..CHUNK_SIZE {
-            for y in 0..CHUNK_SIZE {
-                sprite.set_position(
-                    Vector2f::new(
-                        (self.x as f32) + (x as u32 * (32 * self.scale)) as f32 - camera_offset.x, 
-                        (self.y as f32) + (y as u32 * (32 * self.scale)) as f32 - camera_offset.y
-                    )
-                );
-                sprite.set_scale(Vector2f::new(self.scale as f32, self.scale as f32));
-
-                window.draw(
-                    match self.tiles[x][y] {
-                        1 => sprite,
-                        _ => sprite,
-                    }
-                );
-            }
         }
     }
 }

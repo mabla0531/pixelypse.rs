@@ -1,15 +1,19 @@
-use sfml::{
-    graphics::{Rect, RenderWindow},
-    system::{Vector2f, Vector2u},
-    window::{mouse::Button, Key},
-};
+use std::sync::Arc;
+
+use graphics::Context;
+use opengl_graphics::GlGraphics;
+use piston::{Key, MouseButton, Size};
 
 use crate::{
-    assets::Assets,
-    entities::{entity::{Entity, EntityType}, player::Player, zombie::Zombie},
-    map::Map,
-    State,
+    assets::Assets, entities::{entity::{Entity, EntityType}, player::Player, zombie::Zombie}, map::Map, util::{Rect, Point}, State
 };
+
+#[derive(Clone)]
+pub struct MouseData {
+    pub position: Point<f32>,
+    pub left_click: bool,
+    pub right_click: bool,
+}
 
 #[derive(Clone)]
 pub struct KeyboardData {
@@ -19,38 +23,40 @@ pub struct KeyboardData {
     pub d: bool,
 }
 
-#[derive(Clone)]
-pub struct MouseData {
-    pub position: Vector2f,
-    pub left_click: bool,
-    pub right_click: bool,
-}
-
 pub struct GameState {
     pub map: Map,
     pub entities: Vec<Box<dyn Entity>>,
     pub player: usize, //index of player, so it can always be handled
     pub keyboard_data: KeyboardData,
     pub mouse_data: MouseData,
-    pub game_camera: Rect<f32>,
-    pub window_size: Vector2u,
-    pub assets: Assets,
-    pub scale: u32,
+    pub game_camera: Rect<f64>,
+    pub window_size: Size,
+    pub assets: Arc<Assets>,
 }
 
 impl GameState {
-    pub fn new(assets: Assets, window_size: Vector2u, scale: u32) -> Self {
-        let map = Map::new(scale);
+    pub fn new(assets: Assets, window_size: Size) -> Self {
+
+        let assets = Arc::new(assets);
+
+        let map = Map::new(assets.clone());
 
         let mut entities: Vec<Box<dyn Entity>> = Vec::new();
 
-        entities.push(Box::new(Player::new(scale, assets.clone())));
-        entities.push(Box::new(Zombie::new(scale, assets.clone())));
+        entities.push(Box::new(Player::new(assets.clone())));
+        entities.push(Box::new(Zombie::new(assets.clone())));
         let player = 0;
 
-        let keyboard_data = KeyboardData {w: false, a: false, s: false, d: false};
+        let keyboard_data = KeyboardData {
+            w: false,
+            a: false,
+            s: false,
+            d: false,
+        };
+        
+
         let mouse_data = MouseData {
-            position: Vector2f::new(0.0, 0.0),
+            position: Point::new(0.0, 0.0),
             left_click: false,
             right_click: false,
         };
@@ -65,8 +71,7 @@ impl GameState {
             mouse_data: mouse_data,
             game_camera,
             window_size,
-            assets,
-            scale,
+            assets: assets.clone(),
         }
     }
 }
@@ -92,23 +97,23 @@ impl State for GameState {
         }
     }
 
-    fn mouse_press_event(&mut self, button: Button) {
+    fn mouse_press_event(&mut self, button: MouseButton) {
         match button {
-            Button::Left => self.mouse_data.left_click = true,
-            Button::Right => self.mouse_data.right_click = true,
+            MouseButton::Left => self.mouse_data.left_click = true,
+            MouseButton::Right => self.mouse_data.right_click = true,
             _ => {}
         }
     }
 
-    fn mouse_release_event(&mut self, button: Button) {
+    fn mouse_release_event(&mut self, button: MouseButton) {
         match button {
-            Button::Left => self.mouse_data.left_click = false,
-            Button::Right => self.mouse_data.right_click = false,
+            MouseButton::Left => self.mouse_data.left_click = false,
+            MouseButton::Right => self.mouse_data.right_click = false,
             _ => {}
         }
     }
 
-    fn mouse_position_event(&mut self, position: Vector2f) {
+    fn mouse_position_event(&mut self, position: Point<f32>) {
         self.mouse_data.position = position;
     }
 
@@ -117,18 +122,18 @@ impl State for GameState {
         let player_position = entities[self.player].get_position();
 
         self.game_camera = Rect::new(
-            player_position.x + 16.0 - self.window_size.x as f32 / 2.0,
-            player_position.y + 16.0 - self.window_size.y as f32 / 2.0,
-            self.window_size.x as f32,
-            self.window_size.y as f32,
+            player_position.x + 16.0 - self.window_size.width as f64 / 2.0,
+            player_position.y + 16.0 - self.window_size.height as f64 / 2.0,
+            self.window_size.width as f64,
+            self.window_size.height as f64,
         );
 
         self.game_camera.left = self.game_camera.left
             .max(0.0)
-            .min(self.map.get_map_size_pixels().x as f32 - self.game_camera.width);
+            .min(self.map.get_map_size_pixels().x as f64 - self.game_camera.width());
         self.game_camera.top = self.game_camera.top
             .max(0.0)
-            .min(self.map.get_map_size_pixels().y as f32 - self.game_camera.height);
+            .min(self.map.get_map_size_pixels().y as f64 - self.game_camera.height());
 
         for index in 0..entities.len() {
             if entities[index].get_type() == EntityType::PLAYER {
@@ -139,7 +144,7 @@ impl State for GameState {
         for index in 0..entities.len() {
             let reference_position = match entities[index].get_type() {
                 //if the entity is a player, pass the game camera as position
-                EntityType::PLAYER => Vector2f::new(self.game_camera.left, self.game_camera.top), 
+                EntityType::PLAYER => Point::new(self.game_camera.left, self.game_camera.top), 
                 _ => entities[self.player].get_position()
             };
 
@@ -147,17 +152,17 @@ impl State for GameState {
         }
     }
 
-    fn render(&mut self, window: &mut RenderWindow) {
+    fn render(&mut self, c: Context, g: &mut GlGraphics) {
         //sort entities by Y as to render the higher ones first
         self.entities.sort_by(
             |e1, e2| 
             e1.get_position().y.total_cmp(&e2.get_position().y)
         );
         
-        self.map.render(window, &self.assets.terrain_texture, self.game_camera);
+        self.map.render(c, g, self.game_camera);
 
         for entity in &self.entities {
-            entity.render(window, Vector2f::new(self.game_camera.left, self.game_camera.top));
+            entity.render(c, g, Point::new(self.game_camera.left, self.game_camera.top));
         }
     }
 }
