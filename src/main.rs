@@ -1,44 +1,46 @@
-mod states;
 mod assets;
-mod map;
 mod entities;
+mod map;
+mod states;
 mod util;
 
 use assets::Assets;
 use glutin_window::{GlutinWindow, OpenGL};
 use graphics::Context;
 use opengl_graphics::GlGraphics;
-use piston::{Button, EventSettings, Events, PressEvent, ReleaseEvent, RenderEvent, UpdateEvent, Window, WindowSettings};
+use piston::{
+    Button, EventSettings, Events, PressEvent, ReleaseEvent, RenderEvent, UpdateEvent, Window,
+    WindowSettings,
+};
 use states::{game_state::GameState, state::State};
 
-const WINDOW_WIDTH : u32 = 960;
-const WINDOW_HEIGHT: u32 = 540;
-const TILE_SIZE: usize = 32;
+const WINDOW_WIDTH: u32 = 1280;
+const WINDOW_HEIGHT: u32 = 800;
 
 fn main() {
-    let mut window: GlutinWindow = WindowSettings::new("Hello Piston!", [WINDOW_WIDTH, WINDOW_HEIGHT])
-    .exit_on_esc(true)
-    .build()
-    .expect("Critical error while initializing display system");
+    let mut window: GlutinWindow =
+        WindowSettings::new("Pixelypse 0.1", [WINDOW_WIDTH, WINDOW_HEIGHT])
+            .exit_on_esc(true)
+            .build()
+            .expect("Critical error while initializing display system");
 
     let assets = Assets::new();
 
-    let mut states = Vec::<Box::<dyn State>>::new();
+    let mut states = Vec::<Box<dyn State>>::new();
     let game_state = GameState::new(assets, window.size());
 
     states.push(Box::new(game_state));
-    
+
     let mut events = Events::new(EventSettings::new());
 
-    let opengl = OpenGL::V4_5;
-    let mut gl = GlGraphics::new(opengl);
+    let mut gl = GlGraphics::new(OpenGL::V4_5);
 
     //update input
     while let Some(event) = events.next(&mut window) {
         let top_state_index = states.len() - 1;
-        
+
         // TODO fix this later
-        // if {   
+        // if {
         //     states[top_state_index].mouse_release_event(b);
         // }
         // if {

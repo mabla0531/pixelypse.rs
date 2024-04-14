@@ -4,20 +4,20 @@ use graphics::{Context, DrawState, Image, Transformed};
 use kira::manager::{AudioManager, AudioManagerSettings};
 use opengl_graphics::GlGraphics;
 
-use crate::{assets::Assets, states::game_state::{KeyboardData, MouseData}, util::Point, TILE_SIZE};
+use crate::{assets::Assets, states::game_state::{KeyboardData, MouseData}};
 
-use super::entity::{Entity, EntityType};
+use super::entity::{Entity, EntityType, ENTITY_SIZE};
 
 pub const PLAYER_IMG: Image = Image {
     color: None,
-    rectangle: Some([0.0, 0.0, TILE_SIZE as f64, TILE_SIZE as f64]),
-    source_rectangle: Some([0.0, 0.0, TILE_SIZE as f64, TILE_SIZE as f64]),
+    rectangle: Some([0.0, 0.0, ENTITY_SIZE as f64, ENTITY_SIZE as f64]),
+    source_rectangle: Some([0.0, 0.0, ENTITY_SIZE as f64, ENTITY_SIZE as f64]),
 };
 
 pub struct Player {
     pub x: f64,
     pub y: f64,
-    pub destination: Option<Point<f64>>,
+    pub destination: Option<(f64, f64)>,
 
     pub firing_cooldown: Instant,
 
@@ -28,9 +28,7 @@ pub struct Player {
 
 impl Entity for Player {
     
-    fn move_towards_position(&mut self, _: Point<f64>) {
-        
-    }
+    fn move_towards_position(&mut self, _: (f64, f64)) {}
 
     fn move_entity(&mut self, x: f64, y: f64) {
         if x != 0.0 && y != 0.0 {
@@ -47,13 +45,13 @@ impl Entity for Player {
         EntityType::PLAYER
     }
 
-    fn get_speed(&self) -> f64 { 0.75 }
+    fn get_speed(&self) -> f64 { 0.5 }
 
-    fn get_position(&self) -> Point<f64> {
-        return Point::new(self.x, self.y);
+    fn get_position(&self) -> (f64, f64) {
+        (self.x, self.y)
     }
 
-    fn update(&mut self, _: Point<f64>, key_data: KeyboardData, mouse_data: MouseData) {
+    fn update(&mut self, _: (f64, f64), key_data: KeyboardData, mouse_data: MouseData) {
         
         if mouse_data.left_click {
             if self.firing_cooldown.elapsed().as_millis() >= 1000 {
@@ -70,13 +68,13 @@ impl Entity for Player {
         self.move_entity(x_move, y_move);
     }
 
-    fn render(&self, c: Context, g: &mut GlGraphics, camera_offset: Point<f64>) {
+    fn render(&self, c: Context, g: &mut GlGraphics, camera_offset: (f64, f64)) {
         PLAYER_IMG.draw(
             &self.assets.player_texture, 
-            &DrawState::default(), 
+            &DrawState::default(),
             c.transform.trans(
-                self.x - camera_offset.x, 
-                self.y - camera_offset.y
+                self.x - camera_offset.0, 
+                self.y - camera_offset.1
             ), 
             g
         );

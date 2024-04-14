@@ -5,12 +5,19 @@ use opengl_graphics::GlGraphics;
 use piston::{Key, MouseButton, Size};
 
 use crate::{
-    assets::Assets, entities::{entity::{Entity, EntityType}, player::Player, zombie::Zombie}, map::Map, util::{Rect, Point}, State
+    assets::Assets,
+    entities::{
+        entity::{Entity, EntityType},
+        player::Player,
+        zombie::Zombie,
+    },
+    map::Map,
+    State,
 };
 
 #[derive(Clone)]
 pub struct MouseData {
-    pub position: Point<f32>,
+    pub position: (f64, f64),
     pub left_click: bool,
     pub right_click: bool,
 }
@@ -29,14 +36,13 @@ pub struct GameState {
     pub player: usize, //index of player, so it can always be handled
     pub keyboard_data: KeyboardData,
     pub mouse_data: MouseData,
-    pub game_camera: Rect<f64>,
     pub window_size: Size,
+    pub camera_offset: (f64, f64),
     pub assets: Arc<Assets>,
 }
 
 impl GameState {
     pub fn new(assets: Assets, window_size: Size) -> Self {
-
         let assets = Arc::new(assets);
 
         let map = Map::new(assets.clone());
@@ -47,21 +53,20 @@ impl GameState {
         entities.push(Box::new(Zombie::new(assets.clone())));
         let player = 0;
 
+        let camera_offset = (0.0, 0.0);
+
         let keyboard_data = KeyboardData {
             w: false,
             a: false,
             s: false,
             d: false,
         };
-        
 
         let mouse_data = MouseData {
-            position: Point::new(0.0, 0.0),
+            position: (0.0, 0.0),
             left_click: false,
             right_click: false,
         };
-
-        let game_camera = Rect::new(0.0, 0.0, 0.0, 0.0);
 
         GameState {
             map,
@@ -69,8 +74,8 @@ impl GameState {
             player,
             keyboard_data: keyboard_data,
             mouse_data: mouse_data,
-            game_camera,
             window_size,
+            camera_offset,
             assets: assets.clone(),
         }
     }
@@ -113,7 +118,7 @@ impl State for GameState {
         }
     }
 
-    fn mouse_position_event(&mut self, position: Point<f32>) {
+    fn mouse_position_event(&mut self, position: (f64, f64)) {
         self.mouse_data.position = position;
     }
 
@@ -121,20 +126,21 @@ impl State for GameState {
         let entities = &mut self.entities;
         let player_position = entities[self.player].get_position();
 
-        self.game_camera = Rect::new(
-            player_position.x + 16.0 - self.window_size.width as f64 / 2.0,
-            player_position.y + 16.0 - self.window_size.height as f64 / 2.0,
-            self.window_size.width as f64,
-            self.window_size.height as f64,
+        let map_size: (f64, f64) = (self.map.get_map_size_pixels().0 as f64, self.map.get_map_size_pixels().1 as f64);
+
+        self.camera_offset = (
+            player_position.0 - (self.window_size.width / 2.0), 
+            player_position.1 - (self.window_size.height / 2.0)
         );
-
-        self.game_camera.left = self.game_camera.left
+        
+        self.camera_offset.0 = self.camera_offset.0
             .max(0.0)
-            .min(self.map.get_map_size_pixels().x as f64 - self.game_camera.width());
-        self.game_camera.top = self.game_camera.top
+            .min(map_size.0 - self.window_size.width);
+    
+        self.camera_offset.1 = self.camera_offset.1
             .max(0.0)
-            .min(self.map.get_map_size_pixels().y as f64 - self.game_camera.height());
-
+            .min(map_size.1 as f64 - self.window_size.height);
+        
         for index in 0..entities.len() {
             if entities[index].get_type() == EntityType::PLAYER {
                 self.player = index;
@@ -144,25 +150,31 @@ impl State for GameState {
         for index in 0..entities.len() {
             let reference_position = match entities[index].get_type() {
                 //if the entity is a player, pass the game camera as position
-                EntityType::PLAYER => Point::new(self.game_camera.left, self.game_camera.top), 
-                _ => entities[self.player].get_position()
+                EntityType::PLAYER => (0.0, 0.0),
+                _ => entities[self.player].get_position(),
             };
 
-            entities[index].update(reference_position, self.keyboard_data.clone(), self.mouse_data.clone());
+            entities[index].update(
+                reference_position,
+                self.keyboard_data.clone(),
+                self.mouse_data.clone(),
+            );
         }
     }
 
     fn render(&mut self, c: Context, g: &mut GlGraphics) {
-        //sort entities by Y as to render the higher ones first
-        self.entities.sort_by(
-            |e1, e2| 
-            e1.get_position().y.total_cmp(&e2.get_position().y)
-        );
-        
-        self.map.render(c, g, self.game_camera);
+        //sort entities by Y so the higher ones are rendered first
+        self.entities
+            .sort_by(|e1, e2| e1.get_position().1.total_cmp(&e2.get_position().1));
+
+        self.map.render(c, g, self.camera_offset, self.window_size.into());
 
         for entity in &self.entities {
-            entity.render(c, g, Point::new(self.game_camera.left, self.game_camera.top));
+            entity.render(
+                c,
+                g,
+                self.camera_offset,
+            );
         }
     }
 }

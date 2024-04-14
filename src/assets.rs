@@ -15,9 +15,9 @@ pub struct Assets {
 impl Assets {
     pub fn new() -> Assets {
 
-        let terrain_texture = Texture::from_path("res/textures/terrain.png", &TextureSettings::new()).unwrap();
-        let player_texture = Texture::from_path("res/textures/player.png", &TextureSettings::new()).unwrap();
-        let zombie_texture = Texture::from_path("res/textures/zombie.png", &TextureSettings::new()).unwrap();
+        let terrain_texture = Texture::from_path("res/textures/terrain_8.png", &TextureSettings::new()).unwrap();
+        let player_texture = Texture::from_path("res/textures/player/Idle.png", &TextureSettings::new()).unwrap();
+        let zombie_texture = Texture::from_path("res/textures/zombie/Idle.png", &TextureSettings::new()).unwrap();
 
         //let font = Font::from_file("res/default.ttf").unwrap();
 
