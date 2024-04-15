@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use graphics::{Context, DrawState, Image, Transformed};
 use opengl_graphics::GlGraphics;
+use rand::random;
 
 use crate::{assets::Assets, entities::entity::Entity};
 
@@ -13,10 +14,13 @@ pub const CHUNK_SIZE_PIXELS: usize = CHUNK_SIZE * TILE_SIZE;
 pub const DIRT_IMG: Image = Image {
     color: None,
     rectangle: Some([0.0, 0.0, TILE_SIZE as f64, TILE_SIZE as f64]),
-    source_rectangle: Some([0.0, (TILE_SIZE * 1) as f64, TILE_SIZE as f64, TILE_SIZE as f64]),
+    source_rectangle: Some([0.0, 0.0, TILE_SIZE as f64 - 1.0, TILE_SIZE as f64 - 1.0]), 
+    //                                | for some dogass fricking reason, this is not width/height, this is right/bottom
 };
 
 pub struct Map {
+    //pub seed: i32,
+
     pub chunks: Vec<Vec<Chunk>>,
     pub entities: Vec<Box<dyn Entity>>,
     pub assets: Arc<Assets>
@@ -24,6 +28,12 @@ pub struct Map {
 
 impl Map {
     pub fn new(assets: Arc<Assets>) -> Self {
+
+        let mut seed: i32 = (random::<f32>() * 1000000000.0) as i32;
+        if random::<bool>() { seed *= -1 }
+
+        // TODO: this should cause tile generation to be "random". methodical generation can be added later so it isn't just noisy bullshit. 
+
         let mut chunks = Vec::new();
 
         for x in 0..16 {
@@ -35,6 +45,7 @@ impl Map {
         }
 
         Map {
+            //seed: seed as i32,
             chunks,
             entities: Vec::new(),
             assets
