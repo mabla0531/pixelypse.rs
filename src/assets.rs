@@ -15,9 +15,11 @@ pub struct Assets {
 impl Assets {
     pub fn new() -> Assets {
 
-        let terrain_texture = Texture::from_path("res/textures/terrain_8.png", &TextureSettings::new()).unwrap();
-        let player_texture = Texture::from_path("res/textures/player/Idle.png", &TextureSettings::new()).unwrap();
-        let zombie_texture = Texture::from_path("res/textures/zombie/Idle.png", &TextureSettings::new()).unwrap();
+        let ts_default = &TextureSettings::new().filter(opengl_graphics::Filter::Nearest);
+
+        let terrain_texture = Texture::from_path("res/textures/terrain_8.png", ts_default).unwrap();
+        let player_texture = Texture::from_path("res/textures/player/Idle.png", ts_default).unwrap();
+        let zombie_texture = Texture::from_path("res/textures/zombie/Idle.png", ts_default).unwrap();
 
         //let font = Font::from_file("res/default.ttf").unwrap();
 

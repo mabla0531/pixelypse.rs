@@ -17,6 +17,7 @@ use winit::window::Fullscreen;
 
 fn main() {
     let mut window: GlutinWindow = WindowSettings::new("Pixelypse 0.1", [1280, 720])
+	        .samples(0)
             .graphics_api(OpenGL::V4_5)
             .exit_on_esc(true)
             .decorated(false)

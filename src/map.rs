@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use graphics::{Context, DrawState, Image, Transformed};
 use opengl_graphics::GlGraphics;
-use rand::random;
+use rand::{random, rngs::StdRng, Rng, SeedableRng};
 
 use crate::{assets::Assets, entities::entity::Entity};
 
@@ -11,11 +11,28 @@ pub const CHUNK_SIZE: usize = 8;
 pub const CHUNK_SIZE_PIXELS: usize = CHUNK_SIZE * TILE_SIZE;
 
 // source Image objects, containing the image size and pointing to where the texture exists on the spritesheet
+pub const GRASS_IMG: Image = Image {
+    color: None,
+    rectangle: Some([0.0, 0.0, TILE_SIZE as f64, TILE_SIZE as f64]),
+    source_rectangle: Some([0.0, 0.0, 16.0, 16.0]), 
+};
+
+pub const SAND_IMG: Image = Image {
+    color: None,
+    rectangle: Some([0.0, 0.0, TILE_SIZE as f64, TILE_SIZE as f64]),
+    source_rectangle: Some([16.0, 0.0, 16.0, 16.0]), 
+};
+
 pub const DIRT_IMG: Image = Image {
     color: None,
     rectangle: Some([0.0, 0.0, TILE_SIZE as f64, TILE_SIZE as f64]),
-    source_rectangle: Some([0.0, 0.0, TILE_SIZE as f64 - 1.0, TILE_SIZE as f64 - 1.0]), 
-    //                                | for some dogass fricking reason, this is not width/height, this is right/bottom
+    source_rectangle: Some([0.0, 16.0, 16.0, 16.0]), 
+};
+
+pub const STONE_IMG: Image = Image {
+    color: None,
+    rectangle: Some([0.0, 0.0, TILE_SIZE as f64, TILE_SIZE as f64]),
+    source_rectangle: Some([16.0, 16.0, 16.0, 16.0]), 
 };
 
 pub struct Map {
@@ -29,8 +46,9 @@ pub struct Map {
 impl Map {
     pub fn new(assets: Arc<Assets>) -> Self {
 
-        let mut seed: i32 = (random::<f32>() * 1000000000.0) as i32;
-        if random::<bool>() { seed *= -1 }
+        let seed = random::<u32>();
+
+        println!("{}", seed);
 
         // TODO: this should cause tile generation to be "random". methodical generation can be added later so it isn't just noisy bullshit. 
 
@@ -39,7 +57,7 @@ impl Map {
         for x in 0..16 {
             let mut chunk_row: Vec<Chunk> = Vec::new();
             for y in 0..16 {
-                chunk_row.push(Chunk::new(x * CHUNK_SIZE_PIXELS as i32, y * CHUNK_SIZE_PIXELS as i32));
+                chunk_row.push(Chunk::random(x * CHUNK_SIZE_PIXELS as i32, y * CHUNK_SIZE_PIXELS as i32, seed));
             }
             chunks.push(chunk_row);
         }
@@ -77,8 +95,11 @@ impl Map {
                         for tile_x in 0..chunk.tiles[tile_y].len() {
 
                             let img = match chunk.tiles[tile_x][tile_y] {
-                                1 => DIRT_IMG,
-                                _ => DIRT_IMG,
+                                0 => GRASS_IMG,
+                                1 => SAND_IMG,
+                                2 => DIRT_IMG,
+                                3 => STONE_IMG,
+                                _ => GRASS_IMG,
                             };
 
                             img.draw(
@@ -116,6 +137,32 @@ impl Chunk {
             [1, 1, 1, 1, 1, 1, 1, 1],
             [1, 1, 1, 1, 1, 1, 1, 1],
         ];
+
+        Chunk {
+            x, 
+            y, 
+            tiles
+        }
+    }
+
+    pub fn random(x: i32, y: i32, seed: u32) -> Self {
+        let mut rng = StdRng::seed_from_u64(seed as u64);
+        let mut tiles: [[u16; CHUNK_SIZE]; CHUNK_SIZE] = [
+            [0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0],
+        ];
+
+        for tile_row in tiles.iter_mut() {
+            for tile in tile_row {
+                *tile = rng.gen_range(0..=3);
+            }
+        }
 
         Chunk {
             x, 
