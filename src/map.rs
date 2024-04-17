@@ -1,8 +1,8 @@
-use std::sync::Arc;
+use std::{sync::{mpsc::{self, Receiver, Sender}, Arc}, thread::{self, JoinHandle}};
 
 use graphics::{Context, DrawState, Image, Transformed};
 use opengl_graphics::GlGraphics;
-use rand::{random, rngs::StdRng, Rng, SeedableRng};
+use rand::{rngs::StdRng, Rng, SeedableRng};
 
 use crate::{assets::Assets, entities::entity::Entity};
 
@@ -35,19 +35,38 @@ pub const STONE_IMG: Image = Image {
     source_rectangle: Some([16.0, 16.0, 16.0, 16.0]), 
 };
 
-pub struct Map {
-    //pub seed: i32,
+//#[derive(Clone)]
+pub struct ChunkGeneratorRequest {
+    left: Vec<(i32, i32)>,
+    right: Vec<(i32, i32)>,
+    up: Vec<(i32, i32)>,
+    down: Vec<(i32, i32)>,
+}
 
+// TODO: this can (and will) be done less shit in the future. this is horrible in terms of performance. 
+//#[derive(Clone)]
+pub struct ChunkGeneratorResponse {
+    left: Vec<Chunk>,
+    right: Vec<Chunk>,
+    up: Vec<Chunk>,
+    down: Vec<Chunk>,
+}
+
+pub struct Map {
     pub chunks: Vec<Vec<Chunk>>,
     pub entities: Vec<Box<dyn Entity>>,
-    pub assets: Arc<Assets>
+    pub assets: Arc<Assets>,
+
+    chunk_generator: JoinHandle<()>,
+    chunk_generator_sender: Sender<ChunkGeneratorRequest>,
+    generated_chunks_receiver: Receiver<ChunkGeneratorResponse>,
 }
 
 impl Map {
     pub fn new(assets: Arc<Assets>) -> Self {
 
-        let seed = random::<u32>();
-
+        let seed = rand::thread_rng().gen_range(100000000..1000000000);
+        
         println!("{}", seed);
 
         // TODO: this should cause tile generation to be "random". methodical generation can be added later so it isn't just noisy bullshit. 
@@ -62,11 +81,53 @@ impl Map {
             chunks.push(chunk_row);
         }
 
+        let (chunk_generator_sender, chunk_generator_receiver) = mpsc::channel::<ChunkGeneratorRequest>();
+        let (generated_chunks_sender, generated_chunks_receiver) = mpsc::channel::<ChunkGeneratorResponse>();
+
+        let chunk_generator = thread::spawn(move || {
+            loop {
+                let chunk_request = chunk_generator_receiver.recv().expect("Channel closed");
+                let left: Vec<Chunk> = chunk_request.left
+                    .iter()
+                    .map(|chunk| {
+                        Chunk::random(chunk.0, chunk.1, seed)
+                    }).collect();
+
+                let right: Vec<Chunk> = chunk_request.right
+                    .iter()
+                    .map(|chunk| {
+                        Chunk::random(chunk.0, chunk.1, seed)
+                    }).collect();
+
+                let up: Vec<Chunk> = chunk_request.up
+                    .iter()
+                    .map(|chunk| {
+                        Chunk::random(chunk.0, chunk.1, seed)
+                    }).collect();
+
+                let down: Vec<Chunk> = chunk_request.down
+                    .iter()
+                    .map(|chunk| {
+                        Chunk::random(chunk.0, chunk.1, seed)
+                    }).collect();
+
+                generated_chunks_sender.send(ChunkGeneratorResponse {
+                    left, 
+                    right,
+                    up,
+                    down,
+                }).expect("Channel closed");
+            }
+        });
+
         Map {
-            //seed: seed as i32,
             chunks,
             entities: Vec::new(),
-            assets
+            assets,
+
+            chunk_generator,
+            chunk_generator_sender,
+            generated_chunks_receiver
         }
     }
 
@@ -126,7 +187,7 @@ pub struct Chunk  {
 }
 
 impl Chunk {
-    pub fn new(x: i32, y: i32) -> Self {
+    pub fn template(x: i32, y: i32) -> Self {
         let tiles: [[u16; CHUNK_SIZE]; CHUNK_SIZE] = [
             [1, 1, 1, 1, 1, 1, 1, 1],
             [1, 1, 1, 1, 1, 1, 1, 1],
@@ -146,7 +207,8 @@ impl Chunk {
     }
 
     pub fn random(x: i32, y: i32, seed: u32) -> Self {
-        let mut rng = StdRng::seed_from_u64(seed as u64);
+        let mut rng = StdRng::seed_from_u64((seed as u64 * x.abs() as u64 * y.abs() as u64) as u64);
+        println!("Seeding with: {}", (seed as u64 * x.abs() as u64 * y.abs() as u64) as u64);
         let mut tiles: [[u16; CHUNK_SIZE]; CHUNK_SIZE] = [
             [0, 0, 0, 0, 0, 0, 0, 0],
             [0, 0, 0, 0, 0, 0, 0, 0],

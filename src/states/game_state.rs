@@ -33,7 +33,7 @@ pub struct KeyboardData {
 pub struct GameState {
     pub map: Map,
     pub entities: Vec<Box<dyn Entity>>,
-    pub player: usize, //index of player, so it can always be handled
+    pub player_index: usize,
     pub keyboard_data: KeyboardData,
     pub mouse_data: MouseData,
     pub window_size: Size,
@@ -48,7 +48,6 @@ impl GameState {
         let map = Map::new(assets.clone());
 
         let mut entities: Vec<Box<dyn Entity>> = Vec::new();
-
         entities.push(Box::new(Player::new(assets.clone())));
         entities.push(Box::new(Zombie::new(assets.clone())));
         let player = 0;
@@ -71,7 +70,7 @@ impl GameState {
         GameState {
             map,
             entities,
-            player,
+            player_index: player,
             keyboard_data,
             mouse_data,
             window_size,
@@ -124,36 +123,24 @@ impl State for GameState {
 
     fn update(&mut self) {
         let entities = &mut self.entities;
-        let player_position = entities[self.player].get_position();
+        entities.sort_by(
+            |e1, e2|
+                e1.get_position()
+                .1
+                .partial_cmp(&e2.get_position().1)
+                .unwrap()
+        );
 
-        let map_size: (f64, f64) = (self.map.get_map_size_pixels().0 as f64, self.map.get_map_size_pixels().1 as f64);
+        let player_position = entities[self.player_index].get_position();
 
         self.camera_offset = (
             player_position.0 - (self.window_size.width / 2.0), 
             player_position.1 - (self.window_size.height / 2.0)
         );
-        
-        self.camera_offset.0 = self.camera_offset.0
-            .max(0.0)
-            .min(map_size.0 - self.window_size.width);
-    
-        self.camera_offset.1 = self.camera_offset.1
-            .max(0.0)
-            .min(map_size.1 as f64 - self.window_size.height);
+
+        let reference_position = entities[self.player_index].get_position();
         
         for index in 0..entities.len() {
-            if entities[index].get_type() == EntityType::PLAYER {
-                self.player = index;
-            }
-        }
-
-        for index in 0..entities.len() {
-            let reference_position = match entities[index].get_type() {
-                //if the entity is a player, pass the game camera as position
-                EntityType::PLAYER => (0.0, 0.0),
-                _ => entities[self.player].get_position(),
-            };
-
             entities[index].update(
                 reference_position,
                 self.keyboard_data.clone(),
@@ -165,7 +152,16 @@ impl State for GameState {
     fn render(&mut self, c: Context, g: &mut GlGraphics) {
         //sort entities by Y so the higher ones are rendered first
         self.entities
-            .sort_by(|e1, e2| e1.get_position().1.total_cmp(&e2.get_position().1));
+            .sort_by(|e1, e2| 
+                e1.get_position()
+                .1
+                .total_cmp(&e2.get_position().1)
+            );
+
+        self.player_index = self.entities
+            .iter()
+            .position(|e| e.get_type() == EntityType::PLAYER)
+            .expect("Player does not exist!");
 
         self.map.render(c, g, self.camera_offset, self.window_size.into());
 

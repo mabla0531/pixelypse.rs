@@ -6,7 +6,7 @@ mod util;
 
 use assets::Assets;
 use glutin_window::{GlutinWindow, OpenGL};
-use graphics::{Context, Viewport};
+use graphics::Context;
 use opengl_graphics::GlGraphics;
 use piston::{
     Button, EventSettings, Events, PressEvent, ReleaseEvent, RenderEvent, UpdateEvent, Window,
