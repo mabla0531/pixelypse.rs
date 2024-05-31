@@ -4,70 +4,69 @@ mod map;
 mod states;
 mod util;
 
+use std::time::Instant;
+
+use sfml::{graphics::{Color, RenderTarget, RenderWindow}, system::Vector2f, window::{ContextSettings, Style, VideoMode}};
+
 use assets::Assets;
-use glutin_window::{GlutinWindow, OpenGL};
-use graphics::Context;
-use opengl_graphics::GlGraphics;
-use piston::{
-    Button, EventSettings, Events, PressEvent, ReleaseEvent, RenderEvent, UpdateEvent, Window,
-    WindowSettings,
-};
 use states::{game_state::GameState, state::State};
-use winit::window::Fullscreen;
 
-fn main() {
-    let mut window: GlutinWindow = WindowSettings::new("Pixelypse 0.1", [1280, 720])
-	        .samples(0)
-            .graphics_api(OpenGL::V4_5)
-            .exit_on_esc(true)
-            .decorated(false)
-            .build()
-            .expect("Critical error while initializing display system");
+const WINDOW_WIDTH: u32 = 1200;
+const WINDOW_HEIGHT: u32 = 800;
+
+pub fn main() {
+
+    let mut window = RenderWindow::new(
+        VideoMode::new(WINDOW_WIDTH,  WINDOW_HEIGHT,  16),
+        "Pixelypse", 
+        Style::DEFAULT, 
+        &ContextSettings::default()
+    );
     
-    window.window.set_fullscreen(Some(Fullscreen::Borderless(None))); // I hate it too. I am lazy. You try and make a game in Rust, I'll wait. 
-
     let assets = Assets::new();
-    let mut states: Vec<Box<dyn State>> = vec![Box::new(GameState::new(assets, window.size()))];
-    let mut events = Events::new(EventSettings::new());
-    let mut gl = GlGraphics::new(OpenGL::V4_5);
 
-    //update input
-    while let Some(event) = events.next(&mut window) {
-        let top_state_index = states.len() - 1;
+    let mut states: Vec<Box<dyn State>> = vec![Box::new(GameState::new(
+        assets.clone(), 
+        Vector2f::new(
+            WINDOW_WIDTH as f32, 
+            WINDOW_HEIGHT as f32
+        )
+    ))];
 
-        // TODO impl this later
-        // if {
-        //     states[top_state_index].mouse_release_event(b);
-        // }
-        // if {
-        //     states[top_state_index].mouse_press_event(b);
-        // }
-        // if {
-        //     states[top_state_index].mouse_position_event(Vector2f::new(x_move as f32, y_move as f32));
-        // }
-        if let Some(key) = event.press_args() {
-            if let Button::Keyboard(key) = key {
-                states[top_state_index].keypress_event(key);
+    let mut tick_time = Instant::now();
+
+    while window.is_open() {
+        if let Some(event) = window.poll_event() {
+            match event {
+                sfml::window::Event::Closed => window.close(),
+                sfml::window::Event::Resized { width, height } => {},
+                sfml::window::Event::LostFocus => {},
+                sfml::window::Event::GainedFocus => {},
+                sfml::window::Event::KeyPressed { code, .. } => states.first_mut().unwrap().keypress_event(code),
+                sfml::window::Event::KeyReleased { code, .. } => states.first_mut().unwrap().keyrelease_event(code),
+                sfml::window::Event::MouseWheelScrolled { wheel, delta, x, y } => {},
+                sfml::window::Event::MouseButtonPressed { button, x, y } => {},
+                sfml::window::Event::MouseButtonReleased { button, x, y } => {},
+                sfml::window::Event::MouseMoved { x, y } => {},
+                sfml::window::Event::MouseEntered => {},
+                sfml::window::Event::MouseLeft => {},
+                _ => {},
             }
         }
-        if let Some(key) = event.release_args() {
-            if let Button::Keyboard(key) = key {
-                states[top_state_index].keyrelease_event(key);
-            }
+        
+        // update
+        if tick_time.elapsed().as_millis() >= 10 {
+            tick_time = Instant::now();
+            states
+                .first_mut()
+                .expect("No states!")
+                .update();
         }
 
-        //update game
-        if let Some(_) = event.update_args() {
-            states[top_state_index].update();
-        }
+        // render
+        window.clear(Color::BLACK);
+        states.first_mut().expect("No states!").render(&mut window);
+        window.display();
 
-        //render game
-        if let Some(r) = event.render_args() {
-            gl.draw(r.viewport(), |c: Context, g: &mut GlGraphics| {
-                graphics::clear([0.0, 0.0, 0.0, 1.0], g);
-
-                states[top_state_index].render(c, g);
-            });
-        }
     }
 }
